@@ -3,7 +3,7 @@
     "description": "Installer for UNIT3D",
     "type": "project",
     "require": {
-        "php": ">=8.3",
+        "php": ">=8.4",
         "ext-dom": "*",
         "symfony/console": "^4.4.49",
         "symfony/process": "^4.4.44",
