@@ -6,7 +6,7 @@ Fresh Ubuntu installer for stock UNIT3D Community Edition.
 
 ## This Repository
 
-Installer for [UNIT3D Community Edition](https://github.com/CudoMudo/UNIT3D).
+Installer for [UNIT3D Community Edition](https://github.com/HDInnovations/UNIT3D).
 
 This fork keeps the stock UNIT3D install flow, with one important addition: it installs and configures Meilisearch automatically so Laravel Scout search is ready after installation.
 
