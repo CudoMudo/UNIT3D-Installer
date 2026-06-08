@@ -50,4 +50,5 @@ return [
 
     /* API Keys */
     'tmdb-key' => '',
+    'meilisearch-key' => '',
 ];

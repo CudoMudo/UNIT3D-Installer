@@ -10,6 +10,8 @@ class Unit3dSetup extends BaseInstaller
     {
         $this->clone();
 
+        $this->meilisearch();
+
         $this->env();
 
         $this->perms();
@@ -67,7 +69,8 @@ class Unit3dSetup extends BaseInstaller
                 '{{MAILPORT}}' => $this->config->app('mail_port'),
                 '{{MAILUSERNAME}}' => $this->config->app('mail_username'),
                 '{{MAILPASSWORD}}' => $this->config->app('mail_password'),
-                '{{MAILFROMNAME}}' => $this->config->app('mail_from_name')
+                '{{MAILFROMNAME}}' => $this->config->app('mail_from_name'),
+                '{{MEILISEARCHKEY}}' => $this->meilisearchKey(),
             ],
             '../.env.stub',
             "$install_dir/.env"
@@ -90,6 +93,63 @@ class Unit3dSetup extends BaseInstaller
             "find $install_dir -type d -exec chmod 0775 '{}' + -or -type f -exec chmod 0664 '{}' +",
             "chmod 750 $install_dir/artisan",
             "chmod 640 $install_dir/.env"
+        ]);
+    }
+
+    protected function meilisearch()
+    {
+        $this->io->writeln("\n\n<fg=blue>Installing Meilisearch</>");
+        $this->seperator();
+
+        $key = $this->meilisearchKey();
+
+        $this->process([
+            "getent group meilisearch >/dev/null 2>&1 || groupadd --system meilisearch",
+            "id meilisearch >/dev/null 2>&1 || useradd --system --gid meilisearch --home /var/lib/meilisearch --shell /usr/sbin/nologin meilisearch",
+            "if ! command -v meilisearch >/dev/null 2>&1; then tmp_dir=$(mktemp -d) && cd \$tmp_dir && curl -L https://install.meilisearch.com | bash && install -m 0755 meilisearch /usr/local/bin/meilisearch && rm -rf \$tmp_dir; fi",
+            "mkdir -p /var/lib/meilisearch/data /var/lib/meilisearch/dumps /var/lib/meilisearch/snapshots",
+            "chown -R meilisearch:meilisearch /var/lib/meilisearch",
+            "chmod 750 /var/lib/meilisearch",
+        ]);
+
+        file_put_contents('/etc/meilisearch.toml', <<<TOML
+db_path = "/var/lib/meilisearch/data"
+env = "production"
+http_addr = "127.0.0.1:7700"
+master_key = "$key"
+no_analytics = true
+http_payload_size_limit = "100 MB"
+log_level = "INFO"
+max_indexing_memory = "2 GiB"
+max_indexing_threads = 4
+dump_dir = "/var/lib/meilisearch/dumps"
+snapshot_dir = "/var/lib/meilisearch/snapshots"
+schedule_snapshot = false
+TOML);
+
+        file_put_contents('/etc/systemd/system/meilisearch.service', <<<'SERVICE'
+[Unit]
+Description=Meilisearch
+After=network.target
+
+[Service]
+Type=simple
+User=meilisearch
+Group=meilisearch
+ExecStart=/usr/local/bin/meilisearch --config-file-path /etc/meilisearch.toml
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+SERVICE);
+
+        $this->process([
+            'chown root:meilisearch /etc/meilisearch.toml',
+            'chmod 640 /etc/meilisearch.toml',
+            'systemctl daemon-reload',
+            'systemctl enable --now meilisearch',
         ]);
     }
 
@@ -132,6 +192,7 @@ class Unit3dSetup extends BaseInstaller
             'bun run build',
             'php artisan key:generate',
             'php artisan migrate --seed',
+            'php artisan scout:sync-index-settings',
             'php artisan auto:email-blacklist-update',
             'php artisan test:email'
         ];
@@ -155,6 +216,18 @@ class Unit3dSetup extends BaseInstaller
         $this->process([
             "(crontab -l ; echo \"* * * * * php $install_dir/artisan schedule:run >> /dev/null 2>&1\") | crontab -"
         ]);
+    }
+
+    protected function meilisearchKey()
+    {
+        $key = $this->config->app('meilisearch-key');
+
+        if (empty($key)) {
+            $key = bin2hex(random_bytes(32));
+            $this->config->app('meilisearch-key', $key);
+        }
+
+        return $key;
     }
 
 }
