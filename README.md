@@ -1,4 +1,4 @@
-# UNIT3D Installer
+# UNIT3D Installer (working!)
 
 Fresh Ubuntu installer for stock UNIT3D Community Edition.
 
